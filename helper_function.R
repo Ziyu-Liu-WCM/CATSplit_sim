@@ -1,0 +1,144 @@
+otutabletoabundance <- function(otutable){
+  total_counts <- colSums(otutable)
+  relative_abundance <- sweep(otutable, 2, total_counts, "/")
+  relative_abundance
+}
+
+## compDist function
+compDist<-function(otutable,metric,tree=NULL){
+  if(metric %in% c("Weighted UniFrac","Unweighted UniFrac","robust")){
+    temp<- GUniFrac(t(otutable),tree, verbose = FALSE)
+    if(metric=="Weighted UniFrac"){
+      distMat<-as.dist(temp$unifracs[,,"d_1"])         
+    }else if(metric=="Unweighted UniFrac"){
+      distMat<-as.dist(temp$unifracs[,,"d_UW"])   
+    }else{
+      distMat1<-as.matrix(as.dist(temp$unifracs[,,"d_UW"]))
+      distMat1<-distMat1/max(distMat1)
+      distMat2<-as.matrix(vegdist(t(otutable),"bray"))
+      distMat2<-distMat2/max(distMat2) 
+      distMat<-0.5*distMat1+0.5*distMat2
+    }
+  }else{
+    distMat<-vegdist(t(otutable),metric)    
+  }
+  return(distMat)
+}
+
+
+computeR2 <- function(testList, otutable, taxonomy, metaData, tree, metric, parallel, nCore){
+  distMat <- suppressMessages(compDist(otutable, metric, tree))
+  distResult <- adonis2(distMat ~ metaData[,"BinOutcomes"], permutations = 500)
+  origR2 <- distResult$R2[1]
+  
+  ## Remove one taxonomy feature and compute R^2
+  # if(parallel) {
+  #   registerDoParallel(nCore)
+  #   testResult <- foreach(testIter = 1:length(testList), .combine = 'rbind',
+  #                         .packages = c("ape", "vegan", "GUniFrac"),
+  #                         .export = c("compDist")
+  #   ) %dopar% {
+  #     otutemp <- otutable
+  #     otuUnder <- rownames(otutable)[apply(taxonomy, 1, function(x) sum(any(x %in% testList[testIter]))) > 0]
+  #     otutemp[otuUnder, ] <- 0
+  #     distMat_removed <- compDist(otutemp, metric, tree)
+  #     distResult_removed <- adonis2(distMat_removed ~ metaData[,"BinOutcomes"], permutations = 1)
+  #     taxaR2 <- distResult_removed$R2[1]
+  #     
+  #     deltaR2 <- taxaR2 - origR2
+  #     c(origR2, taxaR2, deltaR2)
+  #   }
+  #   stopImplicitCluster()
+  # } else {
+    testResult <- NULL
+    for(testIter in 1:length(testList)) {
+      otutemp <- otutable
+      otuUnder <- rownames(otutable)[apply(taxonomy, 1, function(x) sum(any(x %in% testList[testIter]))) > 0] 
+      otutemp[otuUnder, ] <- 0
+      distMat_removed <- compDist(otutemp, metric, tree)
+      distResult_removed <- adonis2(distMat_removed ~ metaData[,"BinOutcomes"], permutations = 1)
+      taxaR2 <- distResult_removed$R2[1]
+      
+      deltaR2 <- taxaR2 - origR2
+      newrow <- c(origR2, taxaR2, deltaR2)
+      testResult <- rbind(testResult, newrow)
+    }
+  # }
+  
+  rownames(testResult) <- testList
+  colnames(testResult) <- c("original R2", "After remove taxon R2", "deltaR2")
+  return(testResult)
+}
+
+# mm <- M
+# ww <- abs(M)
+
+
+analys <- function(mm, ww, qval_bound = 0.05){
+  ### mm: mirror statistics
+  ### ww: absolute value of mirror statistics
+  ### qval_bound:  FDR control level
+  cutoff_set <- max(ww)
+  for(t in ww){
+    ps <- length(mm[mm > t])
+    ng <- length(na.omit(mm[mm < -t]))
+    rto <- (ng)/max(ps, 1)
+    if(rto <= qval_bound){
+      cutoff_set <- c(cutoff_set, t)
+    }
+  }
+  cutoff <- min(cutoff_set)
+  selected_index <- which(mm > cutoff)
+  
+  return(selected_index)
+}
+
+
+
+### calculate fdp and power
+fdp_power <- function(selected_index, signal_index){
+  num_selected <- length(selected_index)
+  tp <- length(intersect(selected_index, signal_index))
+  fp <- num_selected - tp
+  fdp <- fp / max(num_selected, 1)
+  power <- tp / length(signal_index)
+  return(list(fdp = fdp, power = power))
+}
+
+
+find_tau <- function(M, target_fdr = 0.05) {
+  # Sort the vector M in descending order
+  M_abs_sorted <- sort(abs(M), decreasing = TRUE)
+  
+  # Initialize variables to store the best tau and current FDP
+  best_tau <- NA
+  fdp <- c(1)  # Start with an FDP of 1 to find the first one below target_fdr
+  
+  # Loop over the sorted values of M to consider them as tau candidates
+  for (i in 1:length(M_abs_sorted)) {
+    tau <- M_abs_sorted[i]
+    
+    # Calculate the number of false discoveries (numerator)
+    numerator <- sum(M < -tau)
+    
+    # Calculate the number of positives (denominator)
+    denominator <- sum(M > tau)
+    
+    # Calculate the False Discovery Proportion (FDP)
+    fdp[i] <- numerator / max(denominator, 1)  # Avoid division by zero
+    
+  }
+  
+  # Find the largest index where FDP is below the target FDR
+  valid_indices <- which(fdp <= target_fdr)
+  
+  
+  # # Return the best tau found that makes FDP < target_fdr
+  if (length(valid_indices) == 0) {
+    return(1)  # If no valid tau found, return 1
+  } else {
+    best_index <- max(valid_indices)  # Largest index where FDP < target_fdr
+    best_tau <- unname(M_abs_sorted[best_index])  # Corresponding tau
+    return(best_tau)
+  }
+}

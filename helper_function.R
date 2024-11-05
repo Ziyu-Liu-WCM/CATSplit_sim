@@ -4,6 +4,16 @@ otutabletoabundance <- function(otutable){
   relative_abundance
 }
 
+permuteRows <- function(mat) {
+  # If matrix has only one row, transpose it to ensure apply works properly
+  if(is.vector(mat)){
+    sample(mat)
+  }else{
+    # Apply sample function to each row
+    t(apply(mat, 1, sample))
+  }
+}
+
 ## compDist function
 compDist<-function(otutable,metric,tree=NULL){
   if(metric %in% c("Weighted UniFrac","Unweighted UniFrac","robust")){
@@ -28,43 +38,21 @@ compDist<-function(otutable,metric,tree=NULL){
 
 computeR2 <- function(testList, otutable, taxonomy, metaData, tree, metric, parallel, nCore){
   distMat <- suppressMessages(compDist(otutable, metric, tree))
-  distResult <- adonis2(distMat ~ metaData[,"BinOutcomes"], permutations = 500)
+  distResult <- adonis2(distMat ~ metaData[,"BinOutcomes"], permutations = 1)
   origR2 <- distResult$R2[1]
-  
-  ## Remove one taxonomy feature and compute R^2
-  # if(parallel) {
-  #   registerDoParallel(nCore)
-  #   testResult <- foreach(testIter = 1:length(testList), .combine = 'rbind',
-  #                         .packages = c("ape", "vegan", "GUniFrac"),
-  #                         .export = c("compDist")
-  #   ) %dopar% {
-  #     otutemp <- otutable
-  #     otuUnder <- rownames(otutable)[apply(taxonomy, 1, function(x) sum(any(x %in% testList[testIter]))) > 0]
-  #     otutemp[otuUnder, ] <- 0
-  #     distMat_removed <- compDist(otutemp, metric, tree)
-  #     distResult_removed <- adonis2(distMat_removed ~ metaData[,"BinOutcomes"], permutations = 1)
-  #     taxaR2 <- distResult_removed$R2[1]
-  #     
-  #     deltaR2 <- taxaR2 - origR2
-  #     c(origR2, taxaR2, deltaR2)
-  #   }
-  #   stopImplicitCluster()
-  # } else {
     testResult <- NULL
     for(testIter in 1:length(testList)) {
       otutemp <- otutable
-      otuUnder <- rownames(otutable)[apply(taxonomy, 1, function(x) sum(any(x %in% testList[testIter]))) > 0] 
-      otutemp[otuUnder, ] <- 0
+      otuUnder <- rownames(otutable)[taxonomy_table$taxa_to_genus %in% testList[testIter]]
+      otutemp[otuUnder,]<-permuteRows(otutable[otuUnder,])
       distMat_removed <- compDist(otutemp, metric, tree)
       distResult_removed <- adonis2(distMat_removed ~ metaData[,"BinOutcomes"], permutations = 1)
       taxaR2 <- distResult_removed$R2[1]
-      
-      deltaR2 <- taxaR2 - origR2
+      deltaR2 <- origR2-taxaR2
       newrow <- c(origR2, taxaR2, deltaR2)
       testResult <- rbind(testResult, newrow)
     }
-  # }
-  
+
   rownames(testResult) <- testList
   colnames(testResult) <- c("original R2", "After remove taxon R2", "deltaR2")
   return(testResult)
@@ -80,15 +68,15 @@ analys <- function(mm, ww, qval_bound = 0.05){
   ### qval_bound:  FDR control level
   cutoff_set <- max(ww)
   for(t in ww){
-    ps <- length(mm[mm > t])
-    ng <- length(na.omit(mm[mm < -t]))
+    ps <- length(mm[mm >= t])
+    ng <- length(na.omit(mm[mm <= -t]))
     rto <- (ng)/max(ps, 1)
     if(rto <= qval_bound){
       cutoff_set <- c(cutoff_set, t)
     }
   }
   cutoff <- min(cutoff_set)
-  selected_index <- which(mm > cutoff)
+  selected_index <- which(mm >= cutoff)
   
   return(selected_index)
 }

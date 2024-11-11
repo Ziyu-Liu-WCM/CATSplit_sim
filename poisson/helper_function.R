@@ -36,7 +36,7 @@ compDist<-function(otutable,metric,tree=NULL){
 }
 
 
-computeR2 <- function(testList, otutable, taxonomy, metaData, tree, metric, parallel, nCore){
+computeR2 <- function(testList, otutable, taxonomy, metaData, tree, metric){
   distMat <- suppressMessages(compDist(otutable, metric, tree))
   distResult <- adonis2(distMat ~ metaData[,"BinOutcomes"], permutations = 1)
   origR2 <- distResult$R2[1]

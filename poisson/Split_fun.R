@@ -16,21 +16,29 @@ singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_tabl
                      tree = tree_data, metric = metric)
   R21<-temp1[1,1]
   beta1<-temp1[,3]
-  beta2 <- computeR2(testList = testList, otutable = data2_otu_table, taxonomy = taxonomy_table, metaData = data2_meta_table,
-                     tree = tree_data, metric = metric)[,3]
-  R22<-temp1[1,1]
+  
+  temp2 <- computeR2(testList = testList, otutable = data2_otu_table, taxonomy = taxonomy_table, metaData = data2_meta_table,
+                     tree = tree_data, metric = metric)
+  R22<-temp2[1,1]
+  beta2<-temp2[,3]
+  
   M <- sign(beta1 * beta2) * (abs(beta1) * abs(beta2))
   selected_index <- analys(M, abs(M), qval_bound)
   M_selected <- M[selected_index]
   inclusion_rep <- ifelse(inclusion_table$feature %in% names(M_selected), 1, 0)
-  save(R21,R22,beta1,beta2, file=paste0("savedData/Internal", rep, ".RData"))
-  return(inclusion_rep)
+    
+  return(list(
+    inclusion_rep = inclusion_rep,
+    R21 = R21,
+    R22 = R22,
+    beta1 = beta1,
+    beta2 = beta2
+  ))
 }
 
 
-
-CATSplit_parallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
-                              metric, nCore, nReps, qval_bound = 0.05){
+CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
+                              metric, nCore, nReps, qval_bound = 0.05, inputParam, iter = 1){
   
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
 
@@ -42,12 +50,13 @@ CATSplit_parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
   start_time <- Sys.time()
 
   # Parallel
-  results <- foreach(rep = 1:nReps, .combine = 'cbind',
+  comp_results <- foreach(rep = 1:nReps,
                      .packages = c("ape", "vegan", "GUniFrac", "doParallel"),
                      .export = c("computeR2","permuteRows", "compDist", "analys", "find_tau","singleSplit")) %dopar% {
                        
                        singleSplit(rep,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
                      }
+  
 
   end_time <- Sys.time()
   cat("Run time:", end_time - start_time)
@@ -63,6 +72,11 @@ CATSplit_parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
   # Call garbage collection
   gc()
   
+  results <- sapply(comp_results, function(x) x$inclusion_rep)
+  R21s <- sapply(comp_results, function(x) x$R21)
+  R22s <- sapply(comp_results, function(x) x$R22)
+  beta1s <- lapply(comp_results, function(x) x$beta1)
+  beta2s <- lapply(comp_results, function(x) x$beta2)
   
   ## Calculated the inclusion rate
   column_sums <- ifelse(colSums(results)==0, 1, colSums(results))
@@ -80,23 +94,41 @@ CATSplit_parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
   ## select features and order them in descending order
   selected_features <- rev(names(inclusion_rate[-(1:l)]))
   
+  # Save R21s, R22s, beta1s, beta2s to an .RData file
+  save_dir <- paste("savedData/CATSplit_Internal/",inputParam, "_", metric, "_nReps", nReps, sep = "")
+  if(!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+  save(R21s, R22s, beta1s, beta2s, file = paste(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData", sep = ""))
+
   return(selected_features)
 }
 
 
-CATSplit_noparallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
-                                metric, nReps, qval_bound = 0.05){
+CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
+                                metric, nReps, qval_bound = 0.05, inputParam, iter = 1){
+  
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
   
+  results <- list()
+  R21s <- numeric(nReps)
+  R22s <- numeric(nReps)
+  beta1s <- list()
+  beta2s <- list()
+  
   # Non-parallel
-  results<-NULL
-  for(iter in 1:nReps){
-    results<-cbind(results,singleSplit(iter,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound))
+  for(r in 1:nReps){
+    comp_results<-singleSplit(iter,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
+    
+    results[[r]] <- comp_results$inclusion_rep
+    R21s[r] <- comp_results$R21
+    R22s[r] <- comp_results$R22
+    beta1s[[r]] <- comp_results$beta1
+    beta2s[[r]] <- comp_results$beta2
   }
 
   ## Calculated the inclusion rate
-  column_sums <- ifelse(colSums(results)==0, 1, colSums(results))
-  inclusion_table$inclusion_rate <- rowMeans(sweep(results, 2, column_sums, "/"))
+  results_matrix <- do.call(cbind, results)
+  column_sums <- ifelse(colSums(results_matrix)==0, 1, colSums(results_matrix))
+  inclusion_table$inclusion_rate <- rowMeans(sweep(results_matrix, 2, column_sums, "/"))
   
   # write.csv(inclusion_table, file = "C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/inclusion_table.csv", row.names = FALSE)
   # inclusion_table <- read.csv("C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/inclusion_table.csv")
@@ -113,5 +145,12 @@ CATSplit_noparallel <- function(otu_table, taxonomy_table, meta_table, tree_data
   ## select features and order them in descending order
   selected_features <- rev(names(inclusion_rate[-(1:l)]))
   
+  # Save R21s, R22s, beta1s, beta2s to an .RData file
+  save_dir <- paste("savedData/CATSplit_Internal/",inputParam, "_", metric, "_nReps", nReps, sep = "")
+  if(!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+  save(R21s, R22s, beta1s, beta2s, file = paste(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData", sep = ""))
+  
   return(selected_features)
 }
+
+

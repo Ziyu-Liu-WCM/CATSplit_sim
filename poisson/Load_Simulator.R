@@ -86,7 +86,6 @@ source("Split_fun.R")
 source("helper_function.R")
 source(readData)
 load(featureData)
-# pkgmaker::source_files(paste(workingDirectory, '/Library/sparseDOSSAhelperFunctions.R', sep=''))
 
 
 ## Parameter Setting
@@ -127,5 +126,5 @@ if(!file.exists(sim_data_file)){
 }
 stopCluster(cl)
 
-print(sim_data_file)
+cat("Simulation datasets at", sim_data_file)
 

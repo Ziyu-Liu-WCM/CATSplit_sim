@@ -41,42 +41,71 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
                               metric, nCore, nReps, qval_bound = 0.05, inputParam, iter = 1){
   
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
-
-  # Register parallel backend
-  cl <- makeCluster(nCore)
-  registerDoParallel(cl)
-
-  # Data Splitting
-  start_time <- Sys.time()
-
-  # Parallel
-  comp_results <- foreach(rep = 1:nReps,
-                     .packages = c("ape", "vegan", "GUniFrac", "doParallel"),
-                     .export = c("computeR2","permuteRows", "compDist", "analys", "find_tau","singleSplit")) %dopar% {
-                       
-                       singleSplit(rep,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
-                     }
   
-
-  end_time <- Sys.time()
-  cat("Run time:", end_time - start_time)
-  # Stop the parallel backend
-  stopCluster(cl)
+  # Check if saved data for the given inputParam exists
+  save_dir <- paste0("savedData/CATSplit_Internal/", inputParam, "_", metric, "_nReps", nReps)
+  save_file <- paste0(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData")
   
-  # Deregister the parallel backend
-  registerDoSEQ()
-  
-  # Remove objects
-  rm(cl)
-  
-  # Call garbage collection
-  gc()
-  
-  results <- sapply(comp_results, function(x) x$inclusion_rep)
-  R21s <- sapply(comp_results, function(x) x$R21)
-  R22s <- sapply(comp_results, function(x) x$R22)
-  beta1s <- lapply(comp_results, function(x) x$beta1)
-  beta2s <- lapply(comp_results, function(x) x$beta2)
+  if (file.exists(save_file)) {
+    # If the file exists, load the saved data
+    cat("Saved R21, R22, beta1, and beta2 detected. Loading data from", save_file, "\n")
+    load(save_file)  # Loads R21s, R22s, beta1s, beta2s
+    
+    results <- matrix(0, nrow = nrow(inclusion_table), ncol = nReps)
+    
+    for (rep in 1:nReps) {
+      beta1 <- beta1s[[rep]]
+      beta2 <- beta2s[[rep]]
+      M <- sign(beta1 * beta2) * (abs(beta1) * abs(beta2))
+      selected_index <- analys(M, abs(M), qval_bound)
+      M_selected <- M[selected_index]
+      inclusion_rep <- ifelse(inclusion_table$feature %in% names(M_selected), 1, 0)
+      results[, rep] <- inclusion_rep
+    }
+    
+  } else {
+    # If the file does not exist, run the parallel computation
+    cat("No saved data detected. Running singleSplit in parallel...\n")
+    # Register parallel backend
+    cl <- makeCluster(nCore)
+    registerDoParallel(cl)
+    
+    # Data Splitting
+    start_time <- Sys.time()
+    
+    # Parallel
+    comp_results <- foreach(rep = 1:nReps,
+                            .packages = c("ape", "vegan", "GUniFrac", "doParallel"),
+                            .export = c("computeR2","permuteRows", "compDist", "analys", "find_tau","singleSplit")) %dopar% {
+                              
+                              singleSplit(rep,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
+                            }
+    
+    
+    end_time <- Sys.time()
+    cat("Run time:", end_time - start_time)
+    # Stop the parallel backend
+    stopCluster(cl)
+    
+    # Deregister the parallel backend
+    registerDoSEQ()
+    
+    # Remove objects
+    rm(cl)
+    
+    # Call garbage collection
+    gc()
+    
+    results <- sapply(comp_results, function(x) x$inclusion_rep)
+    R21s <- sapply(comp_results, function(x) x$R21)
+    R22s <- sapply(comp_results, function(x) x$R22)
+    beta1s <- lapply(comp_results, function(x) x$beta1)
+    beta2s <- lapply(comp_results, function(x) x$beta2)
+    
+    if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+    save(R21s, R22s, beta1s, beta2s, file = save_file)
+    cat("Saved data to", save_file, "\n")
+  }
   
   ## Calculated the inclusion rate
   column_sums <- ifelse(colSums(results)==0, 1, colSums(results))
@@ -93,11 +122,6 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
   
   ## select features and order them in descending order
   selected_features <- rev(names(inclusion_rate[-(1:l)]))
-  
-  # Save R21s, R22s, beta1s, beta2s to an .RData file
-  save_dir <- paste("savedData/CATSplit_Internal/",inputParam, "_", metric, "_nReps", nReps, sep = "")
-  if(!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
-  save(R21s, R22s, beta1s, beta2s, file = paste(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData", sep = ""))
 
   return(selected_features)
 }
@@ -108,25 +132,55 @@ CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data
   
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
   
-  results <- list()
-  R21s <- numeric(nReps)
-  R22s <- numeric(nReps)
-  beta1s <- list()
-  beta2s <- list()
+  # Check if saved data for the given inputParam exists
+  save_dir <- paste0("savedData/CATSplit_Internal/", inputParam, "_", metric, "_nReps", nReps)
+  save_file <- paste0(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData")
   
-  # Non-parallel
-  for(r in 1:nReps){
-    comp_results<-singleSplit(iter,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
+  if (file.exists(save_file)) {
+    # If the file exists, load the saved data
+    cat("Saved R21, R22, beta1, and beta2 detected. Loading data from", save_file, "\n")
+    load(save_file)  # Loads R21s, R22s, beta1s, beta2s
     
-    results[[r]] <- comp_results$inclusion_rep
-    R21s[r] <- comp_results$R21
-    R22s[r] <- comp_results$R22
-    beta1s[[r]] <- comp_results$beta1
-    beta2s[[r]] <- comp_results$beta2
+    results_matrix <- matrix(0, nrow = nrow(inclusion_table), ncol = nReps)
+    
+    for (rep in 1:nReps) {
+      beta1 <- beta1s[[rep]]
+      beta2 <- beta2s[[rep]]
+      M <- sign(beta1 * beta2) * (abs(beta1) * abs(beta2))
+      selected_index <- analys(M, abs(M), qval_bound)
+      M_selected <- M[selected_index]
+      inclusion_rep <- ifelse(inclusion_table$feature %in% names(M_selected), 1, 0)
+      results_matrix[, rep] <- inclusion_rep
+    }
+    
+  } else {
+    # If the file does not exist, run the parallel computation
+    cat("No saved data detected. Running singleSplit in parallel...\n")
+    
+    results <- list()
+    R21s <- numeric(nReps)
+    R22s <- numeric(nReps)
+    beta1s <- list()
+    beta2s <- list()
+    
+    # Non-parallel
+    for(r in 1:nReps){
+      comp_results<-singleSplit(iter,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
+      
+      results[[r]] <- comp_results$inclusion_rep
+      R21s[r] <- comp_results$R21
+      R22s[r] <- comp_results$R22
+      beta1s[[r]] <- comp_results$beta1
+      beta2s[[r]] <- comp_results$beta2
+    }
+    results_matrix <- do.call(cbind, results)
+    
+    if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+    save(R21s, R22s, beta1s, beta2s, file = save_file)
+    cat("Saved data to", save_file, "\n")
   }
 
   ## Calculated the inclusion rate
-  results_matrix <- do.call(cbind, results)
   column_sums <- ifelse(colSums(results_matrix)==0, 1, colSums(results_matrix))
   inclusion_table$inclusion_rate <- rowMeans(sweep(results_matrix, 2, column_sums, "/"))
   
@@ -144,11 +198,6 @@ CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data
   
   ## select features and order them in descending order
   selected_features <- rev(names(inclusion_rate[-(1:l)]))
-  
-  # Save R21s, R22s, beta1s, beta2s to an .RData file
-  save_dir <- paste("savedData/CATSplit_Internal/",inputParam, "_", metric, "_nReps", nReps, sep = "")
-  if(!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
-  save(R21s, R22s, beta1s, beta2s, file = paste(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData", sep = ""))
   
   return(selected_features)
 }

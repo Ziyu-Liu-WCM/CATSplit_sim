@@ -82,7 +82,8 @@ if(!methodName %in% c("CATSplit", "MannWhitney", "DS")) stop("methodName must be
 if(!dataSet %in% c("SCI", "IBD")) stop("dataSet must be one of SCI, IBD")
 if(!featureSet %in% c("lowCor", "highCor", "leastAbun", "mostAbun", "leastVar", "mostVar")) stop("featureSet must be one of lowCor, highCor, leastAbun, mostAbun, leastVar, mostVar")
 if(!metric %in% c("euclidean", "Weighted UniFrac", "Unweighted UniFrac", "robust")) stop("metric must be one of euclidean, Weighted UniFrac, Unweighted UniFrac, robust")
-
+if(methodName %in% c("MannWhitney", "DS")) metric <- "euclidean"
+  
 readData <- paste("preprocess_", dataSet, ".R", sep = "")
 
 if(featureSet %in% c("lowCor", "highCor")){

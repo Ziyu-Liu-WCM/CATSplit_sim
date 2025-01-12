@@ -30,6 +30,9 @@ option_list = list(
     c("-m", "--metric"), default="euclidean", # Spike-in amount
     type = "character"),
   make_option(
+    c("-p", "--nPerm"), default=1, # p stands for how many permutations for each split data
+    type = "integer"),
+  make_option(
     c("-g", "--parallel"), default=TRUE, # Whether parallel computing
     action = "store_false"),
   make_option(
@@ -75,6 +78,7 @@ workingDirectory <- opt$options$workingDirectory # Default parameter
 # nIterations<- 36 # Low-level parameter
 # rSeed <- 1234 # Low-level parameter
 # nCore <- 12 # Low-level parameter
+# nPerm <- 1 # Low-level parameter
 # workingDirectory <- "C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/CATSplit_sim/poisson" # Default parameter
 
 ## Check Input
@@ -159,7 +163,7 @@ if(!file.exists(res_data_file)){
                          if(metric == "euclidean") otu_table <- otutabletoabundance(otu_table)
                          
                          selected_features <- CATSplit_noParallel(otu_table, taxonomy_table, meta_table, tree_data, 
-                                                                  metric, nReps, qval_bound = 0.05, inputParam, iter)
+                                                                  metric, nReps, qval_bound = 0.05, inputParam, iter, nPerm = nPerm)
                          
                          fd_pw <- fdp_power(selected_features, spiked_chain_genera)
                          num_selected <- length(selected_features)

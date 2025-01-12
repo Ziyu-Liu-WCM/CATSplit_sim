@@ -1,5 +1,5 @@
 singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_table, tree_data, 
-                      metric,  qval_bound = 0.05){
+                      metric,  qval_bound = 0.05, nPerm = 1){
   
   data1_ind <- sample(colnames(otu_table), ncol(otu_table)/2, replace = FALSE)
   data2_ind <- setdiff(colnames(otu_table), data1_ind)
@@ -13,12 +13,12 @@ singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_tabl
   testList<-unique(taxonomy_table$taxa_to_genus)
   
   temp1<- computeR2(testList = testList, otutable = data1_otu_table, taxonomy = taxonomy_table, metaData = data1_meta_table,
-                     tree = tree_data, metric = metric, nPerm = 100)
+                     tree = tree_data, metric = metric, nPerm = 1)
   R21<-temp1[1,1]
   beta1<-temp1[,3]
   
   temp2 <- computeR2(testList = testList, otutable = data2_otu_table, taxonomy = taxonomy_table, metaData = data2_meta_table,
-                     tree = tree_data, metric = metric, nPerm = 100)
+                     tree = tree_data, metric = metric, nPerm = 1)
   R22<-temp2[1,1]
   beta2<-temp2[,3]
   
@@ -38,7 +38,7 @@ singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_tabl
 
 
 CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
-                              metric, nCore, nReps, qval_bound = 0.05, inputParam, iter = 1){
+                              metric, nCore, nReps, qval_bound = 0.05, nPerm = 1, inputParam, iter = 1){
   
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
   
@@ -78,7 +78,7 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
                             .packages = c("ape", "vegan", "GUniFrac", "doParallel"),
                             .export = c("computeR2","permuteRows", "compDist", "analys", "find_tau","singleSplit")) %dopar% {
                               
-                              singleSplit(rep,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
+                              singleSplit(rep,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound, nPerm = 1)
                             }
     
     
@@ -128,7 +128,7 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
 
 
 CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
-                                metric, nReps, qval_bound = 0.05, inputParam, iter = 1){
+                                metric, nReps, qval_bound = 0.05, inputParam, iter = 1, nPerm = 1){
   
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
   
@@ -165,7 +165,7 @@ CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data
     
     # Non-parallel
     for(r in 1:nReps){
-      comp_results<-singleSplit(iter,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound)
+      comp_results<-singleSplit(iter,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound, nPerm = 1)
       
       results[[r]] <- comp_results$inclusion_rep
       R21s[r] <- comp_results$R21

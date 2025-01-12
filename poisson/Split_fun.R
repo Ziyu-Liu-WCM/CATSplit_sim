@@ -38,7 +38,7 @@ singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_tabl
 
 
 CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
-                              metric, nCore, nReps, qval_bound = 0.05, nPerm = 1, inputParam, iter = 1){
+                              metric, nCore, nReps, qval_bound = 0.05, inputParam, iter = 1, nPerm = 1){
   
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
   

@@ -36,27 +36,73 @@ compDist<-function(otutable,metric,tree=NULL){
 }
 
 
-computeR2 <- function(testList, otutable, taxonomy, metaData, tree, metric){
+# computeR2 <- function(testList, otutable, taxonomy, metaData, tree, metric){
+#   distMat <- suppressMessages(compDist(otutable, metric, tree))
+#   distResult <- adonis2(distMat ~ metaData[,"BinOutcomes"], permutations = 1)
+#   origR2 <- distResult$R2[1]
+#     testResult <- NULL
+#     for(testIter in 1:length(testList)) {
+#       otutemp <- otutable
+#       otuUnder <- rownames(otutable)[taxonomy_table$taxa_to_genus %in% testList[testIter]]
+#       otutemp[otuUnder,]<-permuteRows(otutable[otuUnder,])
+#       distMat_removed <- compDist(otutemp, metric, tree)
+#       distResult_removed <- adonis2(distMat_removed ~ metaData[,"BinOutcomes"], permutations = 1)
+#       taxaR2 <- distResult_removed$R2[1]
+#       deltaR2 <- origR2-taxaR2
+#       newrow <- c(origR2, taxaR2, deltaR2)
+#       testResult <- rbind(testResult, newrow)
+#     }
+# 
+#   rownames(testResult) <- testList
+#   colnames(testResult) <- c("original R2", "After remove taxon R2", "deltaR2")
+#   return(testResult)
+# }
+
+
+computeR2 <- function(testList, otutable, taxonomy_table, metaData, tree, metric, nPerm = 10) {
+  
+  # 1. Original R squared
   distMat <- suppressMessages(compDist(otutable, metric, tree))
   distResult <- adonis2(distMat ~ metaData[,"BinOutcomes"], permutations = 1)
   origR2 <- distResult$R2[1]
-    testResult <- NULL
-    for(testIter in 1:length(testList)) {
+  
+  testResult <- NULL
+  
+  # Multiple permutations
+  for (testIter in seq_along(testList)) {
+    # Find OTUs that belong to the tested taxon
+    otuUnder <- rownames(otutable)[taxonomy_table$taxa_to_genus %in% testList[testIter]]
+    
+    # Store permuted R squared
+    permR2_vals <- numeric(nPerm)
+    
+    for (i in seq_len(nPerm)) {
       otutemp <- otutable
-      otuUnder <- rownames(otutable)[taxonomy_table$taxa_to_genus %in% testList[testIter]]
-      otutemp[otuUnder,]<-permuteRows(otutable[otuUnder,])
+      
+      # Permute target taxon
+      otutemp[otuUnder, ] <- permuteRows(otutable[otuUnder, ])
+      
+      # Compute Distance Matrix
       distMat_removed <- compDist(otutemp, metric, tree)
       distResult_removed <- adonis2(distMat_removed ~ metaData[,"BinOutcomes"], permutations = 1)
-      taxaR2 <- distResult_removed$R2[1]
-      deltaR2 <- origR2-taxaR2
-      newrow <- c(origR2, taxaR2, deltaR2)
-      testResult <- rbind(testResult, newrow)
+      permR2_vals[i] <- distResult_removed$R2[1]
     }
-
+    
+    # Take mean of multiple permutations
+    taxaR2_mean <- mean(permR2_vals)
+    deltaR2_mean <- origR2 - taxaR2_mean
+    
+    # Store Result
+    newrow <- c(origR2, taxaR2_mean, deltaR2_mean)
+    testResult <- rbind(testResult, newrow)
+  }
+  
+  # Output
   rownames(testResult) <- testList
-  colnames(testResult) <- c("original R2", "After remove taxon R2", "deltaR2")
+  colnames(testResult) <- c("original R2", "avg R2 after removal", "avg deltaR2")
   return(testResult)
 }
+
 
 # mm <- M
 # ww <- abs(M)

@@ -13,16 +13,16 @@ singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_tabl
   testList<-unique(taxonomy_table$taxa_to_genus)
   
   temp1<- computeR2(testList = testList, otutable = data1_otu_table, taxonomy = taxonomy_table, metaData = data1_meta_table,
-                     tree = tree_data, metric = metric)
+                     tree = tree_data, metric = metric, nPerm = 100)
   R21<-temp1[1,1]
   beta1<-temp1[,3]
   
   temp2 <- computeR2(testList = testList, otutable = data2_otu_table, taxonomy = taxonomy_table, metaData = data2_meta_table,
-                     tree = tree_data, metric = metric)
+                     tree = tree_data, metric = metric, nPerm = 100)
   R22<-temp2[1,1]
   beta2<-temp2[,3]
   
-  M <- sign(beta1 * beta2) * (abs(beta1) * abs(beta2))
+  M <- sign(beta1 * beta2) * (abs(beta1) + abs(beta2))
   selected_index <- analys(M, abs(M), qval_bound)
   M_selected <- M[selected_index]
   inclusion_rep <- ifelse(inclusion_table$feature %in% names(M_selected), 1, 0)
@@ -56,7 +56,7 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
     for (rep in 1:nReps) {
       beta1 <- beta1s[[rep]]
       beta2 <- beta2s[[rep]]
-      M <- sign(beta1 * beta2) * (abs(beta1) * abs(beta2))
+      M <- sign(beta1 * beta2) * (abs(beta1) + abs(beta2))
       selected_index <- analys(M, abs(M), qval_bound)
       M_selected <- M[selected_index]
       inclusion_rep <- ifelse(inclusion_table$feature %in% names(M_selected), 1, 0)
@@ -146,7 +146,7 @@ CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data
     for (rep in 1:nReps) {
       beta1 <- beta1s[[rep]]
       beta2 <- beta2s[[rep]]
-      M <- sign(beta1 * beta2) * (abs(beta1) * abs(beta2))
+      M <- sign(beta1 * beta2) * (abs(beta1) + abs(beta2))
       selected_index <- analys(M, abs(M), qval_bound)
       M_selected <- M[selected_index]
       inclusion_rep <- ifelse(inclusion_table$feature %in% names(M_selected), 1, 0)
@@ -154,8 +154,8 @@ CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data
     }
     
   } else {
-    # If the file does not exist, run the parallel computation
-    cat("No saved data detected. Running singleSplit in parallel...\n")
+    # If the file does not exist, run the non-parallel computation
+    cat("No saved data detected. Running singleSplit in non-parallel...\n")
     
     results <- list()
     R21s <- numeric(nReps)

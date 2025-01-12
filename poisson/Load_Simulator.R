@@ -55,9 +55,9 @@ workingDirectory <- opt$options$workingDirectory # Default parameter
 
 ## For Testing
 # dataSet<- "SCI" # High-level parameter
-# featureSet <- "mostAbun"
+# featureSet <- "lowCor"
 # sampleSize<- 44 # High-level parameter
-# addedCount <- 100 # High-level parameter
+# addedCount <- 0 # High-level parameter
 # diriSum <- 62
 # metric <- "euclidean"
 # parallel <- TRUE # Low-level parameter

@@ -24,7 +24,7 @@ option_list = list(
     c("-a", "--addedCount"), default=100, # Spike-in amount
     type = "numeric"),
   make_option(
-    c("-l", "--diriSum"), default=62, # Spike-in amount
+    c("-l", "--diriSum"), default=62,
     type = "numeric"),
   make_option(
     c("-m", "--metric"), default="euclidean", # Spike-in amount
@@ -63,18 +63,18 @@ workingDirectory <- opt$options$workingDirectory # Default parameter
 
 
 ## For Testing
-# methodName <- "DS"
+# methodName <- "CATSplit"
 # nReps <- 50
 # dataSet<- "SCI" # High-level parameter
-# featureSet <- "mostAbun"
+# featureSet <- "lowCor"
 # sampleSize<- 44 # High-level parameter
-# addedCount <- 100 # High-level parameter
+# addedCount <- 0 # High-level parameter
 # diriSum <- 62
 # metric <- "Weighted UniFrac"
 # parallel <- TRUE # Low-level parameter
-# nIterations<- 200 # Low-level parameter
+# nIterations<- 36 # Low-level parameter
 # rSeed <- 1234 # Low-level parameter
-# nCore <- 10 # Low-level parameter
+# nCore <- 12 # Low-level parameter
 # workingDirectory <- "C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/CATSplit_sim/poisson" # Default parameter
 
 ## Check Input

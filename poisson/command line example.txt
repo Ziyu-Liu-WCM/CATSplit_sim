@@ -1,5 +1,13 @@
 cd C:\Users\lclce\Desktop\2nd Sem\Yushu RA\CATSplit\CATSplit_sim\poisson
 
-Rscript Load_Simulator.R  --dataSet SCI --featureSet mostAbun  --sampleSize 44  --addedCount 750 --diriSum 62 --metric euclidean --parallel TRUE --nIterations 200 --rSeed 1234 --nCore 10 --workingDirectory "C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/CATSplit_sim/poisson"
+Rscript Load_Simulator.R  --dataSet SCI --featureSet lowCor  --sampleSize 44  --addedCount 250 --diriSum 62 --metric euclidean --parallel TRUE --nIterations 200 --rSeed 1234 --nCore 10 --workingDirectory "C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/CATSplit_sim/poisson"
 
-Rscript Simulation_Main.R  --methodName CATSplit --nReps 50 --dataSet SCI --featureSet mostAbun  --sampleSize 44  --addedCount 750 --diriSum 62 --metric "Weighted UniFrac" --parallel TRUE --nIterations 200 --rSeed 1234 --nCore 10 --workingDirectory "C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/CATSplit_sim/poisson"
+Rscript Simulation_Main.R  --methodName CATSplit --nReps 50 --dataSet SCI --featureSet lowCor  --sampleSize 44  --addedCount 500 --diriSum 62 --metric "euclidean" --parallel TRUE --nIterations 200 --rSeed 1234 --nCore 10 --workingDirectory "C:/Users/lclce/Desktop/2nd Sem/Yushu RA/CATSplit/CATSplit_sim/poisson"
+
+
+cd C:\Users\lclce\.ssh
+ssh zil4005@scu-login02.med.cornell.edu
+lzydexuexiaomima
+
+
+cd /athena/shilab/scratch

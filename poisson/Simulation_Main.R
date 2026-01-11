@@ -58,6 +58,7 @@ sampleSize<-opt$options$sampleSize # High-level parameter
 addedCount <- opt$options$addedCount # High-level parameter
 diriSum <- opt$options$diriSum # Low-level parameter
 metric <- opt$options$metric # Low-level parameter
+nPerm <- opt$options$nPerm # Low-level parameter
 parallel <- opt$options$parallel # Low-level parameter
 nIterations<-opt$options$nIterations # Low-level parameter
 rSeed <- opt$options$rSeed # Low-level parameter
@@ -144,7 +145,7 @@ if (!dir.exists(outputDirectory)){
 }
 
 
-res_data_file <- paste("savedData/Result/res_data_", methodName, "_", inputParam, "_", metric, "_nReps", nReps, ".RData", sep = "")
+res_data_file <- paste("savedData/Result/res_data_", methodName, "_", inputParam, "_", metric, "_p", nPerm, "_nReps", nReps, ".RData", sep = "")
 
 cat(c("Job started at:",date()), "\n")
 start.time <- Sys.time()

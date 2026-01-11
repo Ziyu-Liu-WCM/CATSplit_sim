@@ -22,7 +22,7 @@ singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_tabl
   R22<-temp2[1,1]
   beta2<-temp2[,3]
   
-  M <- sign(beta1 * beta2) * (abs(beta1) + abs(beta2))
+  M <- sign(beta1 * beta2) * (abs(beta1) * abs(beta2))
   selected_index <- analys(M, abs(M), qval_bound)
   M_selected <- M[selected_index]
   inclusion_rep <- ifelse(inclusion_table$feature %in% names(M_selected), 1, 0)
@@ -40,11 +40,17 @@ singleSplit<-function(rep, inclusion_table, otu_table, taxonomy_table, meta_tabl
 CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
                               metric, nCore, nReps, qval_bound = 0.05, inputParam, iter = 1, nPerm = 1){
   
+  if(is.null(tree_data) & metric != "euclidean") stop("Only euclidean distance is available when phylogenetic tree is not provided!")
+  if(is.null(taxonomy_table)){
+    cat("taxonomy_table not provided. Running per-feature test!\n")
+    taxonomy_table <- data.frame(taxa_to_genus = rownames(otu_table))
+  }
+  
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
   
   # Check if saved data for the given inputParam exists
-  save_dir <- paste0("savedData/CATSplit_Internal/", inputParam, "_", metric, "_nReps", nReps)
-  save_file <- paste0(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData")
+  save_dir <- paste0("savedData/CATSplit_Internal/", inputParam, "_", metric, "_p", nPerm, "_nReps", nReps)
+  save_file <- paste0(save_dir, "/", inputParam, "_", metric, "_p", nPerm, "_nReps", nReps, "_iter", iter, ".RData")
   
   if (file.exists(save_file)) {
     # If the file exists, load the saved data
@@ -83,7 +89,7 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
     
     
     end_time <- Sys.time()
-    cat("Run time:", end_time - start_time)
+    cat("Run time:", end_time - start_time, "\n")
     # Stop the parallel backend
     stopCluster(cl)
     
@@ -102,9 +108,11 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
     beta1s <- lapply(comp_results, function(x) x$beta1)
     beta2s <- lapply(comp_results, function(x) x$beta2)
     
-    if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
-    save(R21s, R22s, beta1s, beta2s, file = save_file)
-    cat("Saved data to", save_file, "\n")
+    if(!is.null(inputParam)){
+      if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+      save(R21s, R22s, beta1s, beta2s, file = save_file)
+      cat("Saved data to", save_file, "\n")
+    }
   }
   
   ## Calculated the inclusion rate
@@ -130,11 +138,17 @@ CATSplit_Parallel <- function(otu_table, taxonomy_table, meta_table, tree_data,
 CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data, 
                                 metric, nReps, qval_bound = 0.05, inputParam, iter = 1, nPerm = 1){
   
+  if(is.null(tree_data) & metric != "euclidean") stop("Only euclidean distance is available when phylogenetic tree is not provided!")
+  if(is.null(taxonomy_table)){
+    cat("taxonomy_table not provided. Running per-feature test!\n")
+    taxonomy_table <- data.frame(taxa_to_genus = rownames(otu_table))
+  }
+  
   inclusion_table <- data.frame(feature = unique(taxonomy_table$taxa_to_genus))
   
   # Check if saved data for the given inputParam exists
   save_dir <- paste0("savedData/CATSplit_Internal/", inputParam, "_", metric, "_nReps", nReps)
-  save_file <- paste0(save_dir, "/", inputParam, "_", metric, "_nReps", nReps, "_iter", iter, ".RData")
+  save_file <- paste0(save_dir, "/", inputParam, "_", metric, "_p", nPerm, "_nReps", nReps, "_iter", iter, ".RData")
   
   if (file.exists(save_file)) {
     # If the file exists, load the saved data
@@ -163,6 +177,8 @@ CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data
     beta1s <- list()
     beta2s <- list()
     
+    start_time <- Sys.time()
+    
     # Non-parallel
     for(r in 1:nReps){
       comp_results<-singleSplit(iter,inclusion_table,otu_table, taxonomy_table, meta_table, tree_data, metric, qval_bound, nPerm = 1)
@@ -175,9 +191,14 @@ CATSplit_noParallel <- function(otu_table, taxonomy_table, meta_table, tree_data
     }
     results_matrix <- do.call(cbind, results)
     
-    if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
-    save(R21s, R22s, beta1s, beta2s, file = save_file)
-    cat("Saved data to", save_file, "\n")
+    end_time <- Sys.time()
+    cat("Run time:", end_time - start_time, "\n")
+    
+    if(!is.null(inputParam)){
+      if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+      save(R21s, R22s, beta1s, beta2s, file = save_file)
+      cat("Saved data to", save_file, "\n")
+    }
   }
 
   ## Calculated the inclusion rate

@@ -116,7 +116,7 @@ analys <- function(mm, ww, qval_bound = 0.05){
   for(t in ww){
     ps <- length(mm[mm >= t])
     ng <- length(na.omit(mm[mm <= -t]))
-    rto <- (ng)/max(ps, 1)
+    rto <- (ng + 1)/max(ps, 1)
     if(rto <= qval_bound){
       cutoff_set <- c(cutoff_set, t)
     }

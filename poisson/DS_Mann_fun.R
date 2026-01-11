@@ -2,14 +2,20 @@
 ## Mann Whitney U test
 Mann_WhitU <- function(otu_table, taxonomy_table, meta_table, qval_bound = 0.05){
   
+  
+  if(is.null(taxonomy_table)){
+    cat("taxonomy_table not provided. Running per-feature test!\n")
+    taxonomy_table <- data.frame(taxa_to_genus = rownames(otu_table))
+  }
+  
   ## Aggregate at genus level
   otu_table$taxa_to_genus <- taxonomy_table$taxa_to_genus
   
   genus_count <- otu_table %>%
-    group_by(taxa_to_genus) %>%
+    dplyr::group_by(taxa_to_genus) %>%
     summarise(across(where(is.numeric), \(x) sum(x, na.rm = TRUE))) %>%
     column_to_rownames("taxa_to_genus")
-  
+
   otu_table <- dplyr::select(otu_table, -taxa_to_genus)
 
   ## Per-feature test
@@ -37,6 +43,11 @@ Mann_WhitU <- function(otu_table, taxonomy_table, meta_table, qval_bound = 0.05)
 
 DS <- function(X, y, taxonomy_table, num_split, qval_bound = 0.05){
   
+  if(is.null(taxonomy_table)){
+    cat("taxonomy_table not provided. Running per-feature test!\n")
+    taxonomy_table <- data.frame(taxa_to_genus = rownames(otu_table))
+  }
+  
   X <- as.data.frame(X)
   X$taxa_to_genus <- taxonomy_table$taxa_to_genus
   
@@ -61,7 +72,7 @@ DS <- function(X, y, taxonomy_table, num_split, qval_bound = 0.05){
     ### get the penalty lambda for Lasso
     cvfit <- cv.glmnet(X[sample_index1, ], y[sample_index1], type.measure = "mse", nfolds = 5)
     lambda <- cvfit$lambda.min
-    
+    ?cv.glmnet
     ### run Lasso on the first half of the data
     beta1 <- as.vector(glmnet(X[sample_index1, ], y[sample_index1], family = "gaussian", alpha = 1, lambda = lambda)$beta)
     # a <- glmnet(X[sample_index1, ], y[sample_index1], family = "gaussian", alpha = 1, lambda = lambda)$beta
@@ -121,6 +132,11 @@ DS <- function(X, y, taxonomy_table, num_split, qval_bound = 0.05){
 
 DSBin <- function(X, y, taxonomy_table, num_split, qval_bound = 0.05){
   
+  if(is.null(taxonomy_table)){
+    cat("taxonomy_table not provided. Running per-feature test!\n")
+    taxonomy_table <- data.frame(taxa_to_genus = rownames(otu_table))
+  }
+  
   X <- as.data.frame(X)
   X$taxa_to_genus <- taxonomy_table$taxa_to_genus
   
@@ -143,7 +159,7 @@ DSBin <- function(X, y, taxonomy_table, num_split, qval_bound = 0.05){
     sample_index2 <- setdiff(c(1:n), sample_index1)
     
     ### get the penalty lambda for Lasso
-    cvfit <- cv.glmnet(X[sample_index1, ], y[sample_index1], family="binomial", nfolds = 5)
+    cvfit <- cv.glmnet(X[sample_index1, ], y[sample_index1], family="binomial", type.measure = "class", nfolds = 5)
     lambda <- cvfit$lambda.min
     if(lambda==min(cvfit$lambda)){
       lambda.sequence <- exp(seq(log(min(cvfit$lambda)*0.01), log(min(cvfit$lambda)), length.out = 100))
